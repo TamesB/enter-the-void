@@ -15,7 +15,8 @@ const BlogPostStream = ({ postId }: { postId: string }) => {
         const stream = await streamBlogPost(postId);
         
         for await (const chunk of stream) {
-          setContent(prev => [...prev, chunk.toString()]);
+          // @ts-expect-error Server-Sent Events have a `data` field that is a string
+          setContent(prev => [...prev, chunk.delta?.text.toString()]);
         }
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to stream blog post'));

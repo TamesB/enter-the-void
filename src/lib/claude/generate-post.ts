@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY || '',
+  dangerouslyAllowBrowser: true,
 });
+
+
 
 async function* generateBlogPost(topic: string) {
   const prompt = await process.env.CLAUDE_PROMPT || '';
@@ -32,9 +35,8 @@ async function* generateBlogPost(topic: string) {
   };
 
   for await (const chunk of stream) {
-    const text = chunk
-    buffer += text;
-
+    // @ts-expect-error Server-Sent Events have a `data` field that is a string
+    buffer += chunk.delta?.text;
     // Try to extract metadata if not already done
     if (!metadata.title) {
       const titleMatch = buffer.match(/TITLE:([^]*?)(?=EXCERPT:)/);
@@ -45,14 +47,13 @@ async function* generateBlogPost(topic: string) {
       if (excerptMatch) metadata.excerpt = excerptMatch[1].trim();
     }
 
-    // Yield metadata and content
-
-
     yield {
       ...metadata,
       content: buffer,
       done: false,
     };
+
+    // update
   }
 
   // Extract final metadata
