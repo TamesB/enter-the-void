@@ -9,7 +9,7 @@ import { Options } from 'rehype-pretty-code';
 const prettyCodeOptions: Options = {
     grid: true,
     theme: {
-        dark: 'one-dark-pro',
+        dark: 'one-dark-pro', 
         light: 'one-dark-pro',
     },
     onVisitLine(node) {
@@ -34,10 +34,11 @@ const prettyCodeOptions: Options = {
   };
 
 interface BlogContentProps {
-  content: string;
+  id: string;
+  content: string; 
 }
 
-export default async function BlogContent({ content }: BlogContentProps) {
+export default async function BlogContent({ id, content }: BlogContentProps) {
       const processedContent = await unified()
         .use(remarkParse)
         .use(remarkRehype)
@@ -47,7 +48,7 @@ export default async function BlogContent({ content }: BlogContentProps) {
 
   const html = String(processedContent);
   return (
-    <article className="prose prose-lg dark:prose-invert max-w-none">
+    <article id={id} className="prose prose-lg dark:prose-invert max-w-none">
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </article>
   );

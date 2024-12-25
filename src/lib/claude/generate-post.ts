@@ -3,13 +3,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.CLAUDE_API_KEY || '',
 });
 
-export default async function generateBlogPost(topic: string): Promise<{
-  title: string;
-  content: string;
-  excerpt: string;
-  previousPage: string;
-  nextPage: string;
-}> {
+async function* generateBlogPost(topic: string) {
   const prompt = await process.env.CLAUDE_PROMPT || '';
   if (!prompt) {
     throw new Error('CLAUDE_PROMPT environment variable is not set');
@@ -17,8 +11,8 @@ export default async function generateBlogPost(topic: string): Promise<{
 
   const formattedPrompt = prompt.replace('{{topic}}', topic);
 
-  const response = await anthropic.messages.create({
-    model: 'claude-3-sonnet-20240229',
+  const stream = await anthropic.messages.create({
+    model: process.env.CLAUDE_MODEL_ID || '',
     max_tokens: 4000,
     messages: [
       {
@@ -26,40 +20,54 @@ export default async function generateBlogPost(topic: string): Promise<{
         content: formattedPrompt,
       },
     ],
+    stream: true,
   });
 
-  // @ts-expect-error: `content` is not a `string`. It is a `Content[]`.
-  const htmltext = response.content.map((c) => c.text).join('\n');
-  const content = htmltext.replace(/\\n/g, '\n');
-
-  // Parse the response
-  const titleMatch = content.match(/TITLE:([^]*?)(?=EXCERPT:)/);
-  const excerptMatch = content.match(/EXCERPT:([^]*?)(?=CONTENT:)/);
-  const contentMatch = content.match(/CONTENT:([^]*?)(?=PREVIOUS_PAGE:)/);
-  const nextPage = content.match(/NEXT_PAGE:([^]*?)(?=PREVIOUS_PAGE:)/);
-  const prevPage = content.match(/PREVIOUS_PAGE:([^]*)/);
-
-  const title = titleMatch ? titleMatch[1].trim() : '';
-  const excerpt = excerptMatch ? excerptMatch[1].trim() : '';
-  const fullContent = contentMatch ? contentMatch[1].trim() : '';
-  const previousPage = prevPage ? prevPage[1].trim() : '';
-  const nextePage = nextPage ? nextPage[1].trim() : '';
-
-  console.log('Title:', title);
-  console.log('Excerpt:', excerpt);
-  console.log('Content:', fullContent);
-  console.log('Previous Page:', previousPage);
-  console.log('Next Page:', nextePage);
-  
-
-
-
-  return {
-    title,
-    content: fullContent,
-    excerpt,
-    previousPage,
-    nextPage: nextePage || '',
+  let buffer = '';
+  const metadata = {
+    title: '',
+    excerpt: '',
+    previousPage: '',
+    nextPage: '',
   };
 
+  for await (const chunk of stream) {
+    const text = chunk
+    buffer += text;
+
+    // Try to extract metadata if not already done
+    if (!metadata.title) {
+      const titleMatch = buffer.match(/TITLE:([^]*?)(?=EXCERPT:)/);
+      if (titleMatch) metadata.title = titleMatch[1].trim();
+    }
+    if (!metadata.excerpt) {
+      const excerptMatch = buffer.match(/EXCERPT:([^]*?)(?=CONTENT:)/);
+      if (excerptMatch) metadata.excerpt = excerptMatch[1].trim();
+    }
+
+    // Yield metadata and content
+
+
+    yield {
+      ...metadata,
+      content: buffer,
+      done: false,
+    };
+  }
+
+  // Extract final metadata
+  const prevPage = buffer.match(/PREVIOUS_PAGE:([^]*)/);
+  const nextPage = buffer.match(/NEXT_PAGE:([^]*?)(?=PREVIOUS_PAGE:)/);
+  const contentMatch = buffer.match(/CONTENT:([^]*?)(?=PREVIOUS_PAGE:)/);
+
+  yield {
+    title: metadata.title,
+    excerpt: metadata.excerpt,
+    content: contentMatch ? contentMatch[1].trim() : '',
+    previousPage: prevPage ? prevPage[1].trim() : '',
+    nextPage: nextPage ? nextPage[1].trim() : '',
+    done: true,
+  };
 }
+
+export default generateBlogPost;
