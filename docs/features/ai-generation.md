@@ -70,7 +70,7 @@ The post should:
 
 2. **Content Generation**
    ```typescript
-   const post = await generateBlogPost(topic);
+   const post = await streamBlogPost(topic);
    ```
 
 3. **Post Processing**
@@ -141,7 +141,7 @@ The system includes robust error handling:
 
 ```typescript
 try {
-  const post = await generateBlogPost(topic);
+  const post = await streamBlogPost(topic);
 } catch (error) {
   if (error instanceof ClaudeAPIError) {
     // Handle API errors

@@ -1,49 +1,48 @@
 'use client';
-import { useState, useEffect } from 'react';
-import streamBlogPost from "./generate-post";
+import React, { useEffect, useState } from 'react';
+import streamBlogPost from './generate-post';
 
-
-const BlogPostStream = ({ postId }: { postId: string }) => {
-  const [content, setContent] = useState<string[]>([]);
+const BlogStreamComponent = ({ topic }: { topic: string }) => {
+  const [chunks, setChunks] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
+  const [error, setError] = useState('');
   useEffect(() => {
-    async function streamContent() {
+    const fetchData = async () => {
       try {
-        setIsLoading(true);
-        const stream = await streamBlogPost(postId);
-        
+        const stream = streamBlogPost(topic)
         for await (const chunk of stream) {
-          // @ts-expect-error Server-Sent Events have a `data` field that is a string
-          setContent(prev => [...prev, chunk.delta?.text.toString()]);
+          console.log(chunk);
+          setChunks((prevChunks) => [...prevChunks, chunk.content]);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to stream blog post'));
-      } finally {
-        setIsLoading(false);
+      } catch (error) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError(String(error));
+        }
       }
+      setIsLoading(false);
     }
-
-    streamContent();
-  }, [postId]);
-
+    fetchData();
+  }
+  , [topic]);
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div>Error loading blog post: {error}</div>;
   }
 
-  if (isLoading && content.length === 0) {
-    return <div>Loading...</div>;
+  if (isLoading && chunks.length === 0) {
+    return <div>Loading blog post...</div>;
   }
 
   return (
-    <article>
-      {content.map((chunk, index) => (
-        <p key={index}>{chunk}</p>
+    <div className="blog-content">
+      {chunks.map((chunk, index) => (
+        <div key={index} className="blog-chunk">
+          {chunk}
+        </div>
       ))}
-      {isLoading && <div>Loading more...</div>}
-    </article>
+    </div>
   );
 };
 
-export default BlogPostStream;
+export default BlogStreamComponent;

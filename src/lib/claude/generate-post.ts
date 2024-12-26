@@ -1,21 +1,34 @@
 import Anthropic from '@anthropic-ai/sdk';
-const anthropic = new Anthropic({
-  apiKey: process.env.CLAUDE_API_KEY || '',
-  dangerouslyAllowBrowser: true,
-});
 
 
+// Validate and sanitize topic
+function validateTopic(topic: string) {
+  if (!topic || typeof topic !== 'string') {
+    return "No topic provided";
+  }
+  
+  
+  // Basic sanitization - remove any control characters
+  return topic.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+}
+const apiKey = await process.env['CLAUDE_API_KEY'];
 
-async function* generateBlogPost(topic: string) {
-  const prompt = await process.env.CLAUDE_PROMPT || '';
-  if (!prompt) {
-    throw new Error('CLAUDE_PROMPT environment variable is not set');
+async function* streamBlogPost(topic: string) {
+  // Validate topic
+  const a = await new Anthropic({apiKey, dangerouslyAllowBrowser: true});
+
+  const sanitizedTopic = validateTopic(topic);
+  let formattedPrompt = '';
+
+  // Format prompt with error handling
+  try {
+    formattedPrompt = (await process.env['CLAUDE_PROMPT'])?.replace('{{topic}}', sanitizedTopic).replace(/\\n/g, '\n') || '';
+  } catch (error) {
+    throw new Error(`Failed to format prompt: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
-  const formattedPrompt = prompt.replace('{{topic}}', topic);
-
-  const stream = await anthropic.messages.create({
-    model: process.env.CLAUDE_MODEL_ID || '',
+  const stream = a.messages.stream({
+    model: process.env['CLAUDE_MODEL_ID'] || '',
     max_tokens: 4000,
     messages: [
       {
@@ -24,6 +37,7 @@ async function* generateBlogPost(topic: string) {
       },
     ],
     stream: true,
+
   });
 
   let buffer = '';
@@ -35,7 +49,6 @@ async function* generateBlogPost(topic: string) {
   };
 
   for await (const chunk of stream) {
-    // @ts-expect-error Server-Sent Events have a `data` field that is a string
     buffer += chunk.delta?.text;
     // Try to extract metadata if not already done
     if (!metadata.title) {
@@ -47,13 +60,15 @@ async function* generateBlogPost(topic: string) {
       if (excerptMatch) metadata.excerpt = excerptMatch[1].trim();
     }
 
+
     yield {
       ...metadata,
       content: buffer,
       done: false,
+      
     };
 
-    // update
+    // update hook
   }
 
   // Extract final metadata
@@ -71,4 +86,4 @@ async function* generateBlogPost(topic: string) {
   };
 }
 
-export default generateBlogPost;
+export default streamBlogPost;

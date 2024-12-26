@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import generateBlogPost from '@/lib/claude/generate-post';
+import streamBlogPost from '@/lib/claude/generate-post';
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const post = await generateBlogPost(topic);
+    const post = await streamBlogPost(topic);
 
     return NextResponse.json(post);
   } catch (error) {

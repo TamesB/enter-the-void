@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
 import { format } from 'date-fns';
 import { notFound } from 'next/navigation';
-import generateBlogPost from '@/lib/claude/generate-post';
+import streamBlogPost from '@/lib/claude/generate-post';
 import {Links} from '@/components/blog/Links';
-import BlogPostStream from '@/lib/claude/blogpost-stream';
+import BlogStreamComponent from '@/lib/claude/blogpost-stream';
 
 function LoadingContent() {
   return <div className="animate-pulse h-96 bg-gray-200 dark:bg-gray-800 rounded-lg" />;
@@ -14,17 +14,21 @@ export default async function Page({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const contentStream = generateBlogPost(slug);
+  const contentStream = streamBlogPost(slug)
+
   let title = '';
   let excerpt = '';
   let previousPage = '';
   let nextPage = '';
-  
+  let content = '';
+
   for await (const chunk of contentStream) {
-    title = chunk.title || title;
-    excerpt = chunk.excerpt || excerpt;
-    previousPage = chunk.previousPage || previousPage;
-    nextPage = chunk.nextPage || nextPage;
+    title = chunk.title || title
+    excerpt = chunk.excerpt || excerpt
+    previousPage = chunk.previousPage || previousPage
+    nextPage = chunk.nextPage || nextPage
+    content = chunk.content || content
+
   }
 
   if (!title) return notFound();
@@ -39,7 +43,7 @@ export default async function Page({
       </header>
         <Links previousPage={previousPage} nextPage={nextPage} />
         <Suspense fallback={<LoadingContent />}>
-          <BlogPostStream postId="123" />
+          <BlogStreamComponent topic={slug} />
         </Suspense>
         <Links previousPage={previousPage} nextPage={nextPage} />
       </article>
